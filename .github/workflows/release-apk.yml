@@ -14,9 +14,14 @@ on:
 permissions:
   contents: write       # Release 생성·자산 업로드용
 
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
 
