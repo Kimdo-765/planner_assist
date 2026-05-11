@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#1a73e8" />
+  <meta name="description" content="해외 출장 항공·숙소 검색 자동 플래너" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="출장플래너" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>해외 출장 플래너</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <button id="back-btn" class="icon-btn" aria-label="뒤로" hidden>‹</button>
+    <h1 id="header-title">해외 출장 플래너</h1>
+    <button id="header-action" class="icon-btn" aria-label="메뉴" hidden></button>
+  </header>
+
+  <main id="app">
+    <!-- ===================== 트립 목록 화면 ===================== -->
+    <section id="view-list" class="view active">
+      <div id="trip-list" class="trip-list" aria-live="polite"></div>
+      <div id="empty-state" class="empty-state">
+        <div class="empty-icon">✈️</div>
+        <p class="empty-title">저장된 출장 계획이 없습니다.</p>
+        <p class="empty-sub">우측 하단 <b>+</b> 버튼으로 새 출장을 만들어 보세요.</p>
+      </div>
+    </section>
+
+    <!-- ===================== 입력/편집 폼 ===================== -->
+    <section id="view-form" class="view">
+      <form id="trip-form" novalidate>
+        <input type="hidden" id="trip-id" />
+
+        <div class="form-group">
+          <label for="trip-name">출장명 (선택)</label>
+          <input type="text" id="trip-name" placeholder="예: 도쿄 클라이언트 미팅" maxlength="60" />
+        </div>
+
+        <div class="form-group">
+          <label for="departure">출발지 <span class="muted small">(여러 곳 선택 가능)</span></label>
+          <div class="autocomplete chips-input" id="departure-wrap">
+            <div class="chips-container" id="departure-chips"></div>
+            <input type="text" id="departure" placeholder="도시 또는 IATA 코드 (예: 인천, ICN, GMP)" autocomplete="off" inputmode="search" />
+            <div class="autocomplete-list" id="departure-list" role="listbox"></div>
+          </div>
+          <p class="field-hint" id="departure-hint">선택한 출발지별로 항공편 검색 링크가 생성됩니다 (최대 5곳).</p>
+        </div>
+
+        <div class="form-group">
+          <label for="destination">현지 업무 장소 (주소·지역·랜드마크)</label>
+          <div class="autocomplete">
+            <input type="text" id="destination" required placeholder="예: Suffolk Virginia / 도쿄 시부야 / Times Square" autocomplete="off" inputmode="search" />
+            <div class="autocomplete-list" id="destination-list" role="listbox"></div>
+          </div>
+          <p class="field-hint" id="destination-hint">정확한 주소·지역명을 입력하세요. OpenStreetMap에서 좌표를 자동 검색합니다.</p>
+        </div>
+
+        <div class="form-group" id="arrival-airports-group" hidden>
+          <label>도착 공항 <span class="muted small">(인근 공항 자동 추천 — 탭하여 추가/제거)</span></label>
+          <div class="airport-pick-list" id="arrival-airports"></div>
+          <p class="field-hint" id="arrival-airports-hint"></p>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="work-start">현지 업무 시작</label>
+            <input type="datetime-local" id="work-start" required />
+          </div>
+          <div class="form-group">
+            <label for="work-end">현지 업무 종료</label>
+            <input type="datetime-local" id="work-end" required />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="people">인원수</label>
+            <input type="number" id="people" min="1" max="50" value="1" required />
+          </div>
+          <div class="form-group">
+            <label for="cabin-class">좌석 등급</label>
+            <select id="cabin-class">
+              <option value="economy">이코노미</option>
+              <option value="premiumeconomy">프리미엄 이코노미</option>
+              <option value="business">비즈니스</option>
+              <option value="first">퍼스트</option>
+            </select>
+          </div>
+        </div>
+
+        <fieldset class="form-group">
+          <legend>객실 배정</legend>
+          <div class="radio-group">
+            <label class="radio">
+              <input type="radio" name="roomMode" value="single" checked />
+              <span>1인 1실</span>
+            </label>
+            <label class="radio">
+              <input type="radio" name="roomMode" value="double" />
+              <span>2인 1실</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="form-group">
+          <legend>환승 옵션</legend>
+          <label class="checkbox">
+            <input type="checkbox" id="allow-transfer" checked />
+            <span>환승 허용 <span class="muted small">(직항 + 환승편 모두 검색)</span></span>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="prefer-direct" />
+            <span>직항 선호 (검색 시 직항 우선)</span>
+          </label>
+
+          <div class="form-group nm" style="margin-top:8px">
+            <label for="min-layover">환승 최소 대기 시간 <span class="muted small">(재수속·항공편 지연 대비)</span></label>
+            <select id="min-layover">
+              <option value="120" selected>2시간 (기본)</option>
+              <option value="150">2시간 30분</option>
+              <option value="180">3시간</option>
+              <option value="240">4시간</option>
+              <option value="300">5시간</option>
+            </select>
+          </div>
+
+          <p class="field-hint">
+            • <b>환승 최소 시간</b>은 Skyscanner 검색 URL의 환승시간 필터에 자동 반영됩니다.<br/>
+            • <b>도착편 지연 2시간 buffer</b>는 일정 계산(권장 도착 시각)에 별도로 자동 반영됩니다.
+          </p>
+        </fieldset>
+
+        <fieldset class="form-group">
+          <legend>여행 일정 여유</legend>
+          <div class="form-row">
+            <div class="form-group nm">
+              <label for="rest-hours">도착 후 휴식 시간</label>
+              <select id="rest-hours">
+                <option value="6">6시간</option>
+                <option value="12" selected>12시간 (전일 도착 권장)</option>
+                <option value="18">18시간</option>
+                <option value="24">24시간 (하루 전 도착)</option>
+              </select>
+            </div>
+            <div class="form-group nm">
+              <label for="post-hours">업무 후 출국 여유</label>
+              <select id="post-hours">
+                <option value="2">2시간</option>
+                <option value="4" selected>4시간</option>
+                <option value="12">12시간</option>
+                <option value="24">24시간 (다음날)</option>
+              </select>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" id="cancel-btn" class="ghost-btn">취소</button>
+          <button type="submit" class="primary-btn">저장</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ===================== 상세 화면 ===================== -->
+    <section id="view-detail" class="view">
+      <div id="trip-detail-content"></div>
+    </section>
+  </main>
+
+  <button id="fab" class="fab" aria-label="새 출장 만들기">+</button>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="airports.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').then((reg) => {
+          // 새 SW 발견 시 자동 활성화 + 1회 reload
+          reg.addEventListener('updatefound', () => {
+            const sw = reg.installing;
+            if (!sw) return;
+            sw.addEventListener('statechange', () => {
+              if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                sw.postMessage('SKIP_WAITING');
+              }
+            });
+          });
+          let reloaded = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (reloaded) return;
+            reloaded = true;
+            window.location.reload();
+          });
+        }).catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

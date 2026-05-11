@@ -1,0 +1,20 @@
+# 빌드 산출물
+dist/
+release.zip
+
+# Bubblewrap / Android (TWA APK 빌드 시 생성)
+android/
+*.keystore
+*.apk
+*.aab
+
+# Node / 에디터
+node_modules/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# 로컬 환경
+.env
+.env.*

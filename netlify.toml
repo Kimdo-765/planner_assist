@@ -1,0 +1,33 @@
+# Netlify 배포 설정
+#
+# 사용법:
+#   1) 깃 저장소를 연결하면 자동 배포
+#   2) 또는 로컬에서:  npx netlify deploy --dir=dist --prod
+#   3) 또는 https://app.netlify.com/drop 에 dist 폴더를 드래그
+
+[build]
+  command  = "bash scripts/build.sh"
+  publish  = "dist"
+
+[build.environment]
+  # GitHub Pages 와 동일한 산출물 생성을 위해 Python 3 가 필요
+  PYTHON_VERSION = "3.11"
+
+# SPA fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Service worker 는 항상 fresh
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Content-Type = "application/javascript; charset=utf-8"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json; charset=utf-8"
+    Cache-Control = "public, max-age=300"

@@ -1,0 +1,38 @@
+{
+  "packageId": "app.plannerassist.twa",
+  "host": "REPLACE_WITH_YOUR_HTTPS_DOMAIN",
+  "name": "해외 출장 플래너",
+  "launcherName": "출장플래너",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#1a73e8",
+  "navigationColor": "#1a73e8",
+  "navigationColorDark": "#0b1320",
+  "navigationDividerColor": "#1a73e8",
+  "navigationDividerColorDark": "#0b1320",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://REPLACE_WITH_YOUR_HTTPS_DOMAIN/icons/icon-512.png",
+  "maskableIconUrl": "https://REPLACE_WITH_YOUR_HTTPS_DOMAIN/icons/icon-512.png",
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://REPLACE_WITH_YOUR_HTTPS_DOMAIN/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": { "enabled": false },
+    "playBilling": { "enabled": false }
+  },
+  "alphaDependencies": { "enabled": false },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://REPLACE_WITH_YOUR_HTTPS_DOMAIN/",
+  "minSdkVersion": 23,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  }
+}

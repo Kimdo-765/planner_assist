@@ -1,0 +1,25 @@
+# Netlify / Cloudflare Pages 호환 헤더.
+# PWA 가 정상 동작하려면 manifest 와 service-worker 응답이 올바른 MIME 으로
+# 내려가야 하고, service-worker.js 는 캐시되지 않아야 한다.
+
+/service-worker.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Content-Type: application/javascript; charset=utf-8
+
+/manifest.webmanifest
+  Content-Type: application/manifest+json; charset=utf-8
+  Cache-Control: public, max-age=300
+
+/*.js
+  Content-Type: application/javascript; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+/*.css
+  Content-Type: text/css; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+/icons/*
+  Cache-Control: public, max-age=86400, immutable
+
+/
+  Cache-Control: public, max-age=300
