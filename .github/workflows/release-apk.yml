@@ -64,23 +64,22 @@ jobs:
           EOF
           cat ~/.bubblewrap/config.json
 
-      - name: twa-manifest 에 버전 주입
+      - name: PWA dist 빌드 (bubblewrap fetch 대상)
+        run: bash scripts/build.sh
+
+      - name: 임시 HTTP 서버 시작 (127.0.0.1:8080 — bubblewrap manifest fetch 용)
         run: |
-          python3 - <<PY
-          import json, pathlib, os
-          p = pathlib.Path('twa-manifest.json')
-          m = json.loads(p.read_text())
-          m['appVersion'] = '${{ steps.ver.outputs.version }}'
-          m['appVersionCode'] = int('${{ steps.ver.outputs.version_code }}')
-          # 빌드시 keystore 가 위치할 절대 경로로 설정
-          m['signingKey']['path'] = os.path.abspath('android.keystore')
-          # webManifestUrl 은 PWA 가 아직 호스팅 안 됐을 수 있어 bubblewrap 이
-          # fetch 시도 시 Invalid URL 로 실패. 매니페스트 파일에 모든 필드가
-          # 이미 들어 있으므로 이 키는 안전하게 제거.
-          m.pop('webManifestUrl', None)
-          p.write_text(json.dumps(m, indent=2, ensure_ascii=False))
-          print(json.dumps(m, indent=2, ensure_ascii=False))
-          PY
+          cd dist
+          nohup python3 -m http.server 8080 --bind 127.0.0.1 > /tmp/http.log 2>&1 &
+          echo $! > /tmp/http.pid
+          for i in 1 2 3 4 5; do
+            sleep 1
+            if curl -fsS http://127.0.0.1:8080/manifest.webmanifest -o /dev/null; then
+              echo "→ 임시 서버 OK (PID $(cat /tmp/http.pid))"
+              break
+            fi
+          done
+          curl -fsS http://127.0.0.1:8080/manifest.webmanifest | head -20
 
       - name: GitHub Secrets 에서 keystore 복원
         env:
@@ -95,15 +94,68 @@ jobs:
           # 무결성 체크: PKCS12 magic = 30 82
           head -c2 android.keystore | xxd
 
-      - name: Bubblewrap 프로젝트 생성
+      - name: Bubblewrap 프로젝트 생성 (임시 HTTP 서버 fetch)
         run: |
-          # bubblewrap 1.24 는 --manifest 를 무조건 URL 로 파싱.
-          # 로컬 파일 경로는 'Invalid URL' 로 실패하므로 file:// 프리픽스 사용.
+          # bubblewrap 1.24 는 --manifest 가 무조건 http(s) URL.
+          # 위 step 에서 띄운 127.0.0.1:8080 의 manifest 로 init.
           mkdir -p ./android
           bubblewrap init \
-            --manifest="file://$PWD/twa-manifest.json" \
+            --manifest=http://127.0.0.1:8080/manifest.webmanifest \
             --directory="$PWD/android" \
             --skipPwaValidation < /dev/null
+        env:
+          CI: 'true'
+
+      - name: 생성된 매니페스트를 GitHub Pages 호스트로 patch
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          # bubblewrap 이 생성한 매니페스트 (디렉토리 내 어딘가의 twa-manifest.json)
+          candidates = list(pathlib.Path('android').rglob('twa-manifest.json'))
+          if not candidates:
+              raise SystemExit("init 결과의 twa-manifest.json 을 찾지 못함")
+          gen = candidates[0]
+          print(f"→ generated: {gen}")
+          src = json.loads(pathlib.Path('twa-manifest.json').read_text())
+          m = json.loads(gen.read_text())
+          # 우리가 원하는 TWA 식별/도메인/외관 값으로 덮어쓰기
+          override_keys = [
+              'packageId', 'host', 'name', 'launcherName',
+              'startUrl', 'iconUrl', 'maskableIconUrl', 'fullScopeUrl',
+              'themeColor', 'navigationColor', 'navigationColorDark',
+              'navigationDividerColor', 'navigationDividerColorDark',
+              'backgroundColor', 'display', 'orientation',
+              'enableNotifications', 'enableSiteSettingsShortcut',
+              'minSdkVersion', 'fallbackType',
+          ]
+          for k in override_keys:
+              if k in src:
+                  m[k] = src[k]
+          m['appVersion'] = os.environ['APP_VERSION']
+          m['appVersionCode'] = int(os.environ['APP_VERSION_CODE'])
+          m['signingKey'] = {
+              'path': os.path.abspath('android.keystore'),
+              'alias': 'android',
+          }
+          gen.write_text(json.dumps(m, indent=2, ensure_ascii=False))
+          print(json.dumps(m, indent=2, ensure_ascii=False))
+          PY
+        env:
+          APP_VERSION: ${{ steps.ver.outputs.version }}
+          APP_VERSION_CODE: ${{ steps.ver.outputs.version_code }}
+
+      - name: 임시 HTTP 서버 종료
+        if: always()
+        run: |
+          if [ -f /tmp/http.pid ]; then
+            kill "$(cat /tmp/http.pid)" 2>/dev/null || true
+          fi
+
+      - name: 매니페스트 패치 반영 — Android 리소스 재생성
+        run: |
+          cd android
+          # update 는 patched twa-manifest.json 으로 AndroidManifest.xml 등을 다시 만듦
+          bubblewrap update --skipVersionUpgrade < /dev/null
         env:
           CI: 'true'
 
