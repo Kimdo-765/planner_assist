@@ -95,6 +95,17 @@ jobs:
           # 무결성 체크: PKCS12 magic = 30 82
           head -c2 android.keystore | xxd
 
+      - name: Bubblewrap 버전 확인 & verbose init 진단
+        run: |
+          bubblewrap --version || true
+          echo "--- bubblewrap init --help ---"
+          bubblewrap init --help || true
+          echo "--- manifest path ---"
+          ls -la twa-manifest.json
+          file twa-manifest.json
+          echo "--- pwd ---"
+          pwd
+
       - name: Bubblewrap 프로젝트 생성
         run: |
           # 출력 디렉토리를 미리 만들어두면 'create now?' 프롬프트가 안 뜸.
@@ -102,9 +113,10 @@ jobs:
           # stdin 은 /dev/null 로 차단 — 인터랙티브 프롬프트가 뜨면 즉시 실패시킴.
           mkdir -p ./android
           bubblewrap init \
-            --manifest=./twa-manifest.json \
-            --directory=./android \
-            --skipPwaValidation < /dev/null
+            --manifest="$PWD/twa-manifest.json" \
+            --directory="$PWD/android" \
+            --skipPwaValidation \
+            --verbose < /dev/null
         env:
           CI: 'true'
 
