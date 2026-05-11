@@ -93,11 +93,15 @@ jobs:
 
       - name: Bubblewrap 프로젝트 생성
         run: |
-          # update --skipVersionUpgrade 옵션을 사용하기 위해 init → update 흐름이 아니라
-          # 그냥 init 으로 매번 새로 생성한다.
-          bubblewrap init --manifest=./twa-manifest.json --directory=./android --skipPwaValidation
+          # bubblewrap 은 여러 단계에서 yes/no 인터랙티브 프롬프트를 띄움
+          # (디렉토리 생성 확인 등). 모두 'yes' 로 자동 응답.
+          # 단, 파이프 실패는 무시 (yes 가 SIGPIPE 로 죽는 것이 정상)
+          set +o pipefail
+          yes | bubblewrap init \
+            --manifest=./twa-manifest.json \
+            --directory=./android \
+            --skipPwaValidation
         env:
-          # bubblewrap 이 인터랙티브 확인을 묻지 않도록
           CI: 'true'
 
       - name: Bubblewrap 빌드 (서명 포함)
