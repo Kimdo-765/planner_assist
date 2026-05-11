@@ -95,28 +95,15 @@ jobs:
           # 무결성 체크: PKCS12 magic = 30 82
           head -c2 android.keystore | xxd
 
-      - name: Bubblewrap 버전 확인 & verbose init 진단
-        run: |
-          bubblewrap --version || true
-          echo "--- bubblewrap init --help ---"
-          bubblewrap init --help || true
-          echo "--- manifest path ---"
-          ls -la twa-manifest.json
-          file twa-manifest.json
-          echo "--- pwd ---"
-          pwd
-
       - name: Bubblewrap 프로젝트 생성
         run: |
-          # 출력 디렉토리를 미리 만들어두면 'create now?' 프롬프트가 안 뜸.
-          # JDK / SDK 경로는 앞 step 에서 ~/.bubblewrap/config.json 으로 주입함.
-          # stdin 은 /dev/null 로 차단 — 인터랙티브 프롬프트가 뜨면 즉시 실패시킴.
+          # bubblewrap 1.24 는 --manifest 를 무조건 URL 로 파싱.
+          # 로컬 파일 경로는 'Invalid URL' 로 실패하므로 file:// 프리픽스 사용.
           mkdir -p ./android
           bubblewrap init \
-            --manifest="$PWD/twa-manifest.json" \
+            --manifest="file://$PWD/twa-manifest.json" \
             --directory="$PWD/android" \
-            --skipPwaValidation \
-            --verbose < /dev/null
+            --skipPwaValidation < /dev/null
         env:
           CI: 'true'
 
