@@ -74,6 +74,10 @@ jobs:
           m['appVersionCode'] = int('${{ steps.ver.outputs.version_code }}')
           # 빌드시 keystore 가 위치할 절대 경로로 설정
           m['signingKey']['path'] = os.path.abspath('android.keystore')
+          # webManifestUrl 은 PWA 가 아직 호스팅 안 됐을 수 있어 bubblewrap 이
+          # fetch 시도 시 Invalid URL 로 실패. 매니페스트 파일에 모든 필드가
+          # 이미 들어 있으므로 이 키는 안전하게 제거.
+          m.pop('webManifestUrl', None)
           p.write_text(json.dumps(m, indent=2, ensure_ascii=False))
           print(json.dumps(m, indent=2, ensure_ascii=False))
           PY
