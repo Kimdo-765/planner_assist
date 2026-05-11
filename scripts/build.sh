@@ -33,6 +33,9 @@ cp manifest.webmanifest "$DIST_DIR/"
 cp service-worker.js "$DIST_DIR/"
 cp -r icons          "$DIST_DIR/"
 
+# TWA assetlinks (Digital Asset Links — APK 풀스크린 검증용)
+if [ -d ".well-known" ]; then cp -r .well-known "$DIST_DIR/"; fi
+
 # 호스팅별 헤더/리다이렉트 설정 동봉
 if [ -f "_headers" ]; then cp _headers "$DIST_DIR/"; fi
 if [ -f "_redirects" ]; then cp _redirects "$DIST_DIR/"; fi

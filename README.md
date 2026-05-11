@@ -25,15 +25,19 @@ planner_assist/
 ├── icons/                   # 앱 아이콘 (svg, 192, 512)
 ├── scripts/
 │   ├── build.sh             # dist/ 와 release.zip 생성
+│   ├── generate_keystore.py # Android 서명용 PKCS12 keystore 생성 (1회용)
 │   ├── make_icons.py        # 아이콘 재생성
 │   └── test_logic.js        # Node 단위 테스트 (48 cases)
+├── .well-known/
+│   └── assetlinks.json      # TWA 풀스크린 검증 (SHA-256 fingerprint)
 ├── netlify.toml             # Netlify 배포 설정
 ├── vercel.json              # Vercel 배포 설정
 ├── _headers / _redirects    # Netlify / Cloudflare Pages
 ├── .github/workflows/
-│   └── deploy.yml           # GitHub Pages 자동 배포
+│   ├── deploy.yml           # GitHub Pages 자동 배포
+│   └── release-apk.yml      # 태그 푸시 → APK 빌드 → Releases 첨부
 ├── twa-manifest.json        # Bubblewrap TWA 설정
-└── docs/ANDROID_APK.md      # APK 빌드 가이드 (TWA)
+└── docs/ANDROID_APK.md      # APK 로컬 빌드 가이드 (TWA)
 ```
 
 ---
@@ -104,29 +108,77 @@ BUILD_VERSION=v1.2.3 bash scripts/build.sh
 
 > 모두 무료 HTTPS 제공. 배포 후 URL 을 단말 Chrome 으로 열고 "홈 화면에 추가".
 
-### C. 진짜 `.apk` 파일 — Bubblewrap TWA
+### C. 진짜 `.apk` 파일 — GitHub Actions 자동 빌드 + Releases
 
-스토어 업로드 / 사이드로딩 / 사내 MDM 일괄 배포가 필요한 경우.
-**자세한 절차는 [`docs/ANDROID_APK.md`](docs/ANDROID_APK.md) 참고.**
+이 저장소에는 태그를 푸시하면 **APK / AAB 를 자동으로 빌드해서 GitHub Releases 에
+첨부** 하는 워크플로(`.github/workflows/release-apk.yml`)가 들어 있습니다.
 
-요약:
+#### 1) GitHub Secrets 4개 등록 (최초 1회)
+
+저장소 → **Settings → Secrets and variables → Actions → New repository secret**
+
+| Secret 이름 | 값 |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | `android.keystore.base64` 파일 내용 전체 |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore 생성 시 출력된 비밀번호 |
+| `ANDROID_KEY_PASSWORD` | (PKCS12 는 동일) |
+| `ANDROID_KEY_ALIAS` | `android` |
+
+keystore 가 없으면:
 
 ```bash
-# 1) twa-manifest.json 안의 도메인 자리표시자를 실제 호스팅 도메인으로 치환
-sed -i 's/REPLACE_WITH_YOUR_HTTPS_DOMAIN/your.domain.com/g' twa-manifest.json
-
-# 2) Bubblewrap 으로 Android 프로젝트 생성 & 빌드
-npm i -g @bubblewrap/cli
-bubblewrap init --manifest=./twa-manifest.json --directory=./android
-cd android && bubblewrap build
-# → app-release-signed.apk (사이드로딩), app-release-bundle.aab (Play 스토어)
-
-# 3) /.well-known/assetlinks.json 를 도메인에 호스팅 (주소창 숨김)
-# 4) adb install -r app-release-signed.apk  또는  Play 콘솔 업로드
+python3 scripts/generate_keystore.py
+# → android.keystore, android.keystore.base64, keystore-info.txt 생성
 ```
 
-> TWA 는 단말의 Chrome 엔진을 사용합니다. 따라서 호스팅된 PWA 가 갱신되면
-> APK 재배포 없이도 앱 내용이 자동 갱신됩니다.
+`keystore-info.txt` 에 위 4개 값이 모두 있습니다. **`.gitignore` 로 자동 제외**되므로 푸시되지 않습니다. Secrets 등록을 끝낸 뒤에는 안전한 곳(1Password, 비밀 USB 등)으로 옮기세요.
+
+#### 2) Digital Asset Links — 풀스크린(주소창 숨김) 검증
+
+TWA APK 가 풀스크린으로 뜨려면 호스팅 도메인 루트에서 `/.well-known/assetlinks.json` 이 200 OK 로 내려가야 합니다.
+
+이 저장소의 `.well-known/assetlinks.json` 에 SHA-256 fingerprint 가 이미 들어 있어, GitHub Pages 가 배포한 사이트에 자동 포함됩니다. **다만 GitHub Pages 의 user-page 서브패스 (`/planner_assist/`) 구조 때문에**, TWA 가 검증하는 경로는 호스트 루트(`https://kimdo-765.github.io/.well-known/assetlinks.json`) 입니다 — 즉, 이 파일이 **`kimdo-765.github.io`** 라는 별도 저장소에 호스팅되어 있어야 합니다.
+
+**해결 방법**:
+
+1. GitHub 에서 `kimdo-765.github.io` 라는 이름의 새 저장소 생성 (user-page)
+2. 그 저장소 루트에 `.well-known/assetlinks.json` 파일 추가 — 본 저장소의 동일 파일을 그대로 복사
+3. 푸시하면 `https://kimdo-765.github.io/.well-known/assetlinks.json` 에서 즉시 응답
+
+> 이 단계를 건너뛰어도 APK 는 동작합니다. 다만 풀스크린 검증이 실패해 주소창이 보일 수 있습니다 (Chrome Custom Tab 폴백).
+
+#### 3) 릴리스 만들기 = 태그 하나 푸시
+
+```bash
+git tag v1.0.0
+git push --tags
+```
+
+워크플로가 자동으로:
+
+1. Java 17 / Node 20 / Android SDK 설치
+2. Bubblewrap 으로 Android 프로젝트 생성 + APK/AAB 빌드 (서명 포함)
+3. **Releases v1.0.0** 생성하고 다음 자산 첨부
+   - `planner-assist-1.0.0.apk` — 사이드로딩용
+   - `planner-assist-1.0.0.aab` — Play 스토어용
+   - `SHA256SUMS.txt` — 무결성 해시
+
+수동으로 빌드만 해보고 싶다면 Actions 탭 → `Build APK & Publish Release` → `Run workflow`. 태그가 없을 때는 Release 가 만들어지지 않고 artifacts 만 다운로드됩니다.
+
+#### 4) 단말에 설치
+
+```bash
+# 옵션 A: PC에서 adb 로 설치
+adb install -r planner-assist-1.0.0.apk
+
+# 옵션 B: APK 를 단말에 옮긴 뒤 탭하여 설치 (출처 알 수 없는 앱 허용 필요)
+```
+
+> TWA 는 단말의 Chrome 엔진을 사용합니다. 호스팅된 PWA 가 갱신되면 APK 재배포
+> 없이도 앱 내용이 자동 갱신됩니다. APK 재빌드는 versionCode / 권한 / 매니페스트
+> 자체를 바꿀 때만 필요합니다.
+
+로컬에서 수동으로 빌드하고 싶다면 [`docs/ANDROID_APK.md`](docs/ANDROID_APK.md) 참고.
 
 ---
 

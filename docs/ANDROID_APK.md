@@ -1,4 +1,8 @@
-# Android APK 만들기 (TWA, Trusted Web Activity)
+# Android APK 만들기 (TWA, Trusted Web Activity) — 로컬 빌드
+
+> **자동 빌드를 원하면** README 의 *"C. 진짜 `.apk` 파일 — GitHub Actions 자동 빌드"* 섹션을
+> 보세요. 태그 푸시 하나로 Release 에 APK/AAB 가 첨부됩니다. 이 문서는 **로컬에서 직접
+> 빌드** 하고 싶을 때만 필요합니다.
 
 이미 PWA 로 동작하므로, Android 사용자는 Chrome 의 **홈 화면에 추가** 만으로
 네이티브 앱처럼 사용할 수 있습니다. 그래도 **`.apk` 파일을 직접 배포**(사이드로딩)
@@ -23,17 +27,10 @@
 
 ---
 
-## 1) 도메인 결정 & 매니페스트 자리표시자 치환
+## 1) 도메인 확인
 
-`twa-manifest.json` 안의 `REPLACE_WITH_YOUR_HTTPS_DOMAIN` 을 실제 도메인으로 바꿉니다.
-
-예: `planner-assist.example.com`
-
-```bash
-sed -i 's/REPLACE_WITH_YOUR_HTTPS_DOMAIN/planner-assist.example.com/g' twa-manifest.json
-```
-
-> macOS 의 BSD `sed` 는 `-i ''` 가 필요합니다: `sed -i '' 's/.../.../g' twa-manifest.json`
+`twa-manifest.json` 은 이미 `kimdo-765.github.io` (GitHub Pages) 기준으로 작성되어 있습니다.
+다른 도메인을 사용한다면 `host`, `startUrl`, `iconUrl`, `webManifestUrl`, `fullScopeUrl` 5개 값을 일관되게 바꾸세요.
 
 ---
 
@@ -53,6 +50,8 @@ bubblewrap init --manifest=./twa-manifest.json --directory=./android
 
 ## 3) 서명 키 생성 (1 회)
 
+JDK 가 있다면 표준 방식:
+
 ```bash
 keytool -genkey -v \
   -keystore android.keystore \
@@ -60,8 +59,16 @@ keytool -genkey -v \
   -keyalg RSA -keysize 2048 -validity 10000
 ```
 
+JDK 없이 Python 만으로:
+
+```bash
+python3 scripts/generate_keystore.py
+# android.keystore + android.keystore.base64 + keystore-info.txt 생성
+# (PKCS12, Bubblewrap / jarsigner 호환)
+```
+
 > **이 키스토어 파일은 분실하면 Play 스토어에 더 이상 업데이트를 올릴 수 없습니다.**
-> 안전한 곳에 백업하세요. 비밀번호도 잊지 말 것.
+> 안전한 곳에 백업하세요. 비밀번호도 잊지 말 것. `.gitignore` 가 git 커밋은 자동으로 막아줍니다.
 
 ---
 

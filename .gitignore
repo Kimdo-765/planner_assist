@@ -5,8 +5,10 @@ release.zip
 # Bubblewrap / Android (TWA APK 빌드 시 생성)
 android/
 *.keystore
+*.keystore.*
 *.apk
 *.aab
+keystore-info.txt
 
 # Node / 에디터
 node_modules/

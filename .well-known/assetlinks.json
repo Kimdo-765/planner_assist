@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.plannerassist.twa",
+      "sha256_cert_fingerprints": [
+        "DE:20:15:C4:0D:68:BF:5B:EE:D1:12:FD:81:3F:4B:EC:8D:B8:E1:92:80:19:D1:E9:E9:15:C7:20:33:32:D4:A1"
+      ]
+    }
+  }
+]
