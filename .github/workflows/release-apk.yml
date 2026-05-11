@@ -94,13 +94,12 @@ jobs:
       - name: Bubblewrap 프로젝트 생성
         run: |
           # 출력 디렉토리를 미리 만들어두면 'create now?' 프롬프트가 안 뜸.
-          # JDK / SDK 경로도 CLI 옵션으로 직접 전달 → 모든 인터랙티브 우회.
+          # JDK / SDK 경로는 앞 step 에서 ~/.bubblewrap/config.json 으로 주입함.
+          # stdin 은 /dev/null 로 차단 — 인터랙티브 프롬프트가 뜨면 즉시 실패시킴.
           mkdir -p ./android
           bubblewrap init \
             --manifest=./twa-manifest.json \
             --directory=./android \
-            --jdkPath="$JAVA_HOME" \
-            --androidSdkPath="$ANDROID_HOME" \
             --skipPwaValidation < /dev/null
         env:
           CI: 'true'
