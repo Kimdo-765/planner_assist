@@ -93,14 +93,15 @@ jobs:
 
       - name: Bubblewrap 프로젝트 생성
         run: |
-          # bubblewrap 은 여러 단계에서 yes/no 인터랙티브 프롬프트를 띄움
-          # (디렉토리 생성 확인 등). 모두 'yes' 로 자동 응답.
-          # 단, 파이프 실패는 무시 (yes 가 SIGPIPE 로 죽는 것이 정상)
-          set +o pipefail
-          yes | bubblewrap init \
+          # 출력 디렉토리를 미리 만들어두면 'create now?' 프롬프트가 안 뜸.
+          # JDK / SDK 경로도 CLI 옵션으로 직접 전달 → 모든 인터랙티브 우회.
+          mkdir -p ./android
+          bubblewrap init \
             --manifest=./twa-manifest.json \
             --directory=./android \
-            --skipPwaValidation
+            --jdkPath="$JAVA_HOME" \
+            --androidSdkPath="$ANDROID_HOME" \
+            --skipPwaValidation < /dev/null
         env:
           CI: 'true'
 
