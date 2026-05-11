@@ -67,19 +67,20 @@ jobs:
       - name: PWA dist 빌드 (bubblewrap fetch 대상)
         run: bash scripts/build.sh
 
-      - name: 임시 HTTP 서버 시작 (127.0.0.1:8080 — bubblewrap manifest fetch 용)
+      - name: 임시 HTTP 서버 시작 (포트 80, host=localhost)
         run: |
-          cd dist
-          nohup python3 -m http.server 8080 --bind 127.0.0.1 > /tmp/http.log 2>&1 &
-          echo $! > /tmp/http.pid
+          # bubblewrap inquirer 가 'host:port' 형식을 invalid hostname 으로 거부.
+          # 80 포트로 띄워 host=localhost (포트 미포함) 가 되도록.
+          sudo nohup python3 -m http.server 80 --bind 127.0.0.1 --directory "$PWD/dist" \
+            > /tmp/http.log 2>&1 &
           for i in 1 2 3 4 5; do
             sleep 1
-            if curl -fsS http://127.0.0.1:8080/manifest.webmanifest -o /dev/null; then
-              echo "→ 임시 서버 OK (PID $(cat /tmp/http.pid))"
+            if curl -fsS http://localhost/manifest.webmanifest -o /dev/null; then
+              echo "→ 임시 서버 OK"
               break
             fi
           done
-          curl -fsS http://127.0.0.1:8080/manifest.webmanifest | head -20
+          curl -fsS http://localhost/manifest.webmanifest | head -20
 
       - name: GitHub Secrets 에서 keystore 복원
         env:
@@ -96,13 +97,12 @@ jobs:
 
       - name: Bubblewrap 프로젝트 생성 (임시 HTTP 서버 fetch)
         run: |
-          # bubblewrap 1.24 는 --manifest 가 무조건 http(s) URL + 매니페스트에
-          # TWA 전용 필드가 없으면 5+ 개 보충 질문을 띄움.
-          # 모든 default 를 받아들이는 빈 줄(Enter) 시퀀스를 stdin 으로 공급한다.
-          # init 결과의 host/packageId 등은 어차피 다음 step 에서 patch 한다.
+          # bubblewrap 1.24 는 manifest 인자가 http(s) URL 이어야 함 + TWA 전용
+          # 필드 미설정 시 보충 질문을 띄움. 모든 default 를 받아들이는 빈 줄
+          # 시퀀스를 stdin 으로 공급. 결과 매니페스트는 다음 step 에서 patch.
           mkdir -p ./android
           (for i in $(seq 1 60); do echo; done) | bubblewrap init \
-            --manifest=http://127.0.0.1:8080/manifest.webmanifest \
+            --manifest=http://localhost/manifest.webmanifest \
             --directory="$PWD/android" \
             --skipPwaValidation
         env:
@@ -148,10 +148,7 @@ jobs:
 
       - name: 임시 HTTP 서버 종료
         if: always()
-        run: |
-          if [ -f /tmp/http.pid ]; then
-            kill "$(cat /tmp/http.pid)" 2>/dev/null || true
-          fi
+        run: sudo pkill -f "http.server 80" 2>/dev/null || true
 
       - name: 매니페스트 패치 반영 — Android 리소스 재생성
         run: |
