@@ -96,13 +96,15 @@ jobs:
 
       - name: Bubblewrap 프로젝트 생성 (임시 HTTP 서버 fetch)
         run: |
-          # bubblewrap 1.24 는 --manifest 가 무조건 http(s) URL.
-          # 위 step 에서 띄운 127.0.0.1:8080 의 manifest 로 init.
+          # bubblewrap 1.24 는 --manifest 가 무조건 http(s) URL + 매니페스트에
+          # TWA 전용 필드가 없으면 5+ 개 보충 질문을 띄움.
+          # 모든 default 를 받아들이는 빈 줄(Enter) 시퀀스를 stdin 으로 공급한다.
+          # init 결과의 host/packageId 등은 어차피 다음 step 에서 patch 한다.
           mkdir -p ./android
-          bubblewrap init \
+          (for i in $(seq 1 60); do echo; done) | bubblewrap init \
             --manifest=http://127.0.0.1:8080/manifest.webmanifest \
             --directory="$PWD/android" \
-            --skipPwaValidation < /dev/null
+            --skipPwaValidation
         env:
           CI: 'true'
 
