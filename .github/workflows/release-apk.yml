@@ -53,6 +53,17 @@ jobs:
       - name: Bubblewrap CLI 설치
         run: npm install -g @bubblewrap/cli
 
+      - name: Bubblewrap config 사전 설정 (인터랙티브 프롬프트 우회)
+        run: |
+          mkdir -p ~/.bubblewrap
+          cat > ~/.bubblewrap/config.json <<EOF
+          {
+            "jdkPath": "${JAVA_HOME}",
+            "androidSdkPath": "${ANDROID_HOME}"
+          }
+          EOF
+          cat ~/.bubblewrap/config.json
+
       - name: twa-manifest 에 버전 주입
         run: |
           python3 - <<PY
