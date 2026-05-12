@@ -1,0 +1,76 @@
+name: Publish Release (PWA bundle)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 단위 테스트
+        run: node scripts/test_logic.js
+
+      - name: dist/ + release.zip 빌드
+        run: bash scripts/build.sh
+        env:
+          BUILD_VERSION: ${{ github.ref_name }}
+
+      - name: 자산 이름에 버전 반영
+        id: pkg
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          cp release.zip "planner-assist-${V}.zip"
+          (cd dist && sha256sum -- * | sort > ../SHA256SUMS.txt) || true
+          ls -la planner-assist-${V}.zip SHA256SUMS.txt
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: GitHub Release 생성 & 자산 첨부
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            ## 해외 출장 플래너 ${{ github.ref_name }}
+
+            ### 사용법
+            - **추천**: https://kimdo-765.github.io/planner_assist/ 를 Android Chrome 에서 열고 **메뉴 → 홈 화면에 추가**. PWA 가 설치되어 풀스크린·오프라인 동작.
+            - **자체 호스팅**: `planner-assist-${{ steps.pkg.outputs.version }}.zip` 다운로드 → 임의의 정적 HTTPS 호스트(Netlify, Vercel, Cloudflare Pages, 사내 서버 등)에 업로드 → 그 URL 을 Chrome 에서 동일하게 "홈 화면에 추가".
+
+            ### 무결성
+            `SHA256SUMS.txt` 의 해시로 zip 내부 파일을 검증할 수 있습니다.
+
+            ### 변경사항
+          files: |
+            planner-assist-${{ steps.pkg.outputs.version }}.zip
+            SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: planner-assist-${{ steps.pkg.outputs.version }}
+          path: |
+            planner-assist-*.zip
+            SHA256SUMS.txt
+            dist
