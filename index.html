@@ -96,17 +96,33 @@
         </div>
 
         <fieldset class="form-group">
-          <legend>객실 배정</legend>
-          <div class="radio-group">
-            <label class="radio">
-              <input type="radio" name="roomMode" value="single" checked />
-              <span>1인 1실</span>
+          <legend>객실 배정 <span class="muted small">(인원수를 1·2·3·4인실에 어떻게 나눌지 지정)</span></legend>
+          <div class="room-alloc-grid">
+            <label class="room-alloc">
+              <span class="room-alloc-label">1인 1실</span>
+              <input type="number" id="rooms-1" min="0" max="50" value="1" inputmode="numeric" />
+              <span class="room-alloc-suffix">개</span>
             </label>
-            <label class="radio">
-              <input type="radio" name="roomMode" value="double" />
-              <span>2인 1실</span>
+            <label class="room-alloc">
+              <span class="room-alloc-label">2인 1실</span>
+              <input type="number" id="rooms-2" min="0" max="50" value="0" inputmode="numeric" />
+              <span class="room-alloc-suffix">개</span>
+            </label>
+            <label class="room-alloc">
+              <span class="room-alloc-label">3인 1실</span>
+              <input type="number" id="rooms-3" min="0" max="50" value="0" inputmode="numeric" />
+              <span class="room-alloc-suffix">개</span>
+            </label>
+            <label class="room-alloc">
+              <span class="room-alloc-label">4인 1실</span>
+              <input type="number" id="rooms-4" min="0" max="50" value="0" inputmode="numeric" />
+              <span class="room-alloc-suffix">개</span>
             </label>
           </div>
+          <div class="room-alloc-actions">
+            <button type="button" id="rooms-auto-btn" class="ghost-btn small-btn">인원수만큼 1인 1실 자동 배정</button>
+          </div>
+          <p class="field-hint" id="room-alloc-hint"></p>
         </fieldset>
 
         <fieldset class="form-group">

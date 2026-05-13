@@ -46,7 +46,52 @@ function migrateTrip(trip) {
 
   // (3) 환승 최소 대기 시간 기본값
   if (trip.minLayoverMinutes == null) trip.minLayoverMinutes = DEFAULT_MIN_LAYOVER_MINUTES;
+
+  // (4) 객실 배정: 구버전 roomMode → roomAllocation {r1,r2,r3,r4}
+  if (!trip.roomAllocation || typeof trip.roomAllocation !== 'object') {
+    const people = Math.max(1, Number(trip.people) || 1);
+    if (trip.roomMode === 'double') {
+      trip.roomAllocation = {
+        r1: people % 2,
+        r2: Math.floor(people / 2),
+        r3: 0,
+        r4: 0
+      };
+    } else {
+      trip.roomAllocation = { r1: people, r2: 0, r3: 0, r4: 0 };
+    }
+  } else {
+    trip.roomAllocation = normalizeRoomAllocation(trip.roomAllocation);
+  }
+  delete trip.roomMode;
   return trip;
+}
+
+function normalizeRoomAllocation(alloc) {
+  const a = alloc || {};
+  return {
+    r1: Math.max(0, Number(a.r1) || 0),
+    r2: Math.max(0, Number(a.r2) || 0),
+    r3: Math.max(0, Number(a.r3) || 0),
+    r4: Math.max(0, Number(a.r4) || 0)
+  };
+}
+function roomAllocPeople(alloc) {
+  const a = normalizeRoomAllocation(alloc);
+  return a.r1 * 1 + a.r2 * 2 + a.r3 * 3 + a.r4 * 4;
+}
+function roomAllocCount(alloc) {
+  const a = normalizeRoomAllocation(alloc);
+  return a.r1 + a.r2 + a.r3 + a.r4;
+}
+function roomAllocSummary(alloc) {
+  const a = normalizeRoomAllocation(alloc);
+  const parts = [];
+  if (a.r1) parts.push(`1인 1실 ${a.r1}개`);
+  if (a.r2) parts.push(`2인 1실 ${a.r2}개`);
+  if (a.r3) parts.push(`3인 1실 ${a.r3}개`);
+  if (a.r4) parts.push(`4인 1실 ${a.r4}개`);
+  return parts.length ? parts.join(' + ') : '미지정';
 }
 function loadTrips() {
   try {
@@ -172,12 +217,12 @@ function calculatePlan(trip) {
   const returnDate = dateOnly(departAfter);
 
   const people = Math.max(1, Number(trip.people) || 1);
-  const rooms = trip.roomMode === 'double' ? Math.ceil(people / 2) : people;
-  let roomsBreakdown = null;
-  if (trip.roomMode === 'double') {
-    const doubles = Math.floor(people / 2);
-    const singles = people % 2;
-    roomsBreakdown = { doubles, singles };
+  const allocation = normalizeRoomAllocation(trip.roomAllocation);
+  // 배정 합이 0이면 기본값 (1인 1실 × people)
+  let rooms = roomAllocCount(allocation);
+  if (rooms === 0) {
+    allocation.r1 = people;
+    rooms = people;
   }
 
   return {
@@ -185,7 +230,8 @@ function calculatePlan(trip) {
     arrivalBy, departAfter,
     outboundDate, returnDate,
     checkIn, checkOut, nights,
-    people, rooms, roomsBreakdown,
+    people, rooms,
+    roomAllocation: allocation,
     restHours, postHours,
     arrivalDelayBuffer: ARRIVAL_DELAY_BUFFER_HOURS
   };
@@ -383,11 +429,12 @@ function renderList() {
       ? `<span class="iata">?</span>`
       : arrivalCodes.map((c) => `<span class="iata">${escapeHtml(c)}</span>`).join(`<span class="comma">,</span>`);
     const destLabel = dest.displayName || dest.query || dest.city || '-';
+    const badgeRooms = plan ? plan.rooms : roomAllocCount(trip.roomAllocation);
     return `
       <article class="trip-card" data-id="${trip.id}" tabindex="0" role="button">
         <div class="trip-card-row">
           <div class="trip-card-title">${escapeHtml(title)}</div>
-          <span class="trip-card-badge">${trip.roomMode === 'double' ? '2인1실' : '1인1실'}</span>
+          <span class="trip-card-badge">객실 ${badgeRooms}개</span>
         </div>
         <div class="trip-card-route">
           ${depCodesHtml}
@@ -839,7 +886,8 @@ function resetForm() {
   $('#allow-transfer').checked = true;
   $('#prefer-direct').checked = false;
   $('#min-layover').value = String(DEFAULT_MIN_LAYOVER_MINUTES);
-  $$('input[name="roomMode"]').forEach((r) => { r.checked = (r.value === 'single'); });
+  setRoomAllocationInputs({ r1: 1, r2: 0, r3: 0, r4: 0 });
+  updateRoomAllocHint();
 }
 
 function loadFormFromTrip(trip) {
@@ -885,7 +933,47 @@ function loadFormFromTrip(trip) {
   $('#allow-transfer').checked = trip.allowTransfer !== false;
   $('#prefer-direct').checked = !!trip.preferDirect;
   $('#min-layover').value = String(trip.minLayoverMinutes != null ? trip.minLayoverMinutes : DEFAULT_MIN_LAYOVER_MINUTES);
-  $$('input[name="roomMode"]').forEach((r) => { r.checked = (r.value === (trip.roomMode || 'single')); });
+  setRoomAllocationInputs(trip.roomAllocation || { r1: trip.people || 1, r2: 0, r3: 0, r4: 0 });
+  updateRoomAllocHint();
+}
+
+function readRoomAllocationInputs() {
+  return normalizeRoomAllocation({
+    r1: $('#rooms-1').value,
+    r2: $('#rooms-2').value,
+    r3: $('#rooms-3').value,
+    r4: $('#rooms-4').value
+  });
+}
+function setRoomAllocationInputs(alloc) {
+  const a = normalizeRoomAllocation(alloc);
+  $('#rooms-1').value = String(a.r1);
+  $('#rooms-2').value = String(a.r2);
+  $('#rooms-3').value = String(a.r3);
+  $('#rooms-4').value = String(a.r4);
+}
+function updateRoomAllocHint() {
+  const hintEl = $('#room-alloc-hint');
+  if (!hintEl) return;
+  const people = Math.max(0, Number($('#people').value) || 0);
+  const alloc = readRoomAllocationInputs();
+  const sumPeople = roomAllocPeople(alloc);
+  const totalRooms = roomAllocCount(alloc);
+  hintEl.classList.remove('warn', 'ok');
+  if (totalRooms === 0) {
+    hintEl.textContent = '객실을 1개 이상 배정해 주세요.';
+    hintEl.classList.add('warn');
+    return;
+  }
+  if (people > 0 && sumPeople !== people) {
+    const diff = sumPeople - people;
+    const diffMsg = diff > 0 ? `${diff}명 초과` : `${-diff}명 부족`;
+    hintEl.innerHTML = `현재 <b>객실 ${totalRooms}개 · 수용 ${sumPeople}명</b> — 인원수 ${people}명과 ${diffMsg}`;
+    hintEl.classList.add('warn');
+    return;
+  }
+  hintEl.innerHTML = `총 <b>객실 ${totalRooms}개 · ${sumPeople}명</b> 배정 (${roomAllocSummary(alloc)})`;
+  hintEl.classList.add('ok');
 }
 
 function readForm() {
@@ -894,7 +982,7 @@ function readForm() {
   const workEnd = $('#work-end').value;
   const people = Number($('#people').value) || 1;
   const cabinClass = $('#cabin-class').value;
-  const roomMode = ($$('input[name="roomMode"]').find((r) => r.checked) || {}).value || 'single';
+  const roomAllocation = readRoomAllocationInputs();
   const allowTransfer = $('#allow-transfer').checked;
   const preferDirect = $('#prefer-direct').checked;
   const restHours = Number($('#rest-hours').value) || 12;
@@ -917,6 +1005,17 @@ function readForm() {
   }
   if (people < 1) errors.push('인원수는 최소 1명입니다.');
 
+  const totalRooms = roomAllocCount(roomAllocation);
+  const sumPeople = roomAllocPeople(roomAllocation);
+  if (totalRooms === 0) {
+    errors.push('객실을 1개 이상 배정해 주세요.');
+  } else if (sumPeople !== people) {
+    const diff = sumPeople - people;
+    errors.push(diff > 0
+      ? `객실 수용 인원(${sumPeople}명)이 인원수(${people}명)보다 ${diff}명 많습니다.`
+      : `객실 수용 인원(${sumPeople}명)이 인원수(${people}명)보다 ${-diff}명 부족합니다.`);
+  }
+
   const destination = selectedDestination ? {
     query: selectedDestination.query,
     displayName: selectedDestination.displayName,
@@ -933,7 +1032,7 @@ function readForm() {
       departures: departures.map((d) => ({ code: d.code, city: d.city, cityEn: d.cityEn, country: d.country, label: d.label })),
       destination,
       arrivalAirports: selectedArrivalCodes.slice(),
-      workStart, workEnd, people, cabinClass, roomMode, allowTransfer, preferDirect, restHours, postHours, minLayoverMinutes
+      workStart, workEnd, people, cabinClass, roomAllocation, allowTransfer, preferDirect, restHours, postHours, minLayoverMinutes
     }
   };
 }
@@ -981,9 +1080,7 @@ function renderDetail(trip) {
     : '직항만 검색합니다.';
   const directNote = trip.preferDirect ? ' 직항 우선 옵션이 활성화되어 있습니다.' : '';
 
-  const roomsLine = trip.roomMode === 'double'
-    ? `2인 1실 기준 <b>${plan.rooms}개 객실</b> ${plan.roomsBreakdown.singles ? `(2인실 ${plan.roomsBreakdown.doubles}개 + 1인실 ${plan.roomsBreakdown.singles}개)` : `(2인실 ${plan.roomsBreakdown.doubles}개)`}`
-    : `1인 1실 기준 <b>${plan.rooms}개 객실</b>`;
+  const roomsLine = `<b>${plan.rooms}개 객실 · ${roomAllocPeople(plan.roomAllocation)}명 수용</b> (${roomAllocSummary(plan.roomAllocation)})`;
 
   const firstDep = departures[0];
   const titleFirst = (firstDep && firstDep.city) || '?';
@@ -1195,6 +1292,32 @@ function bindEvents() {
     toast('저장되었습니다.');
     openDetail(trip.id);
   });
+
+  // 객실 배정 실시간 안내 + 인원수 변경 시 자동 분배
+  ['#rooms-1', '#rooms-2', '#rooms-3', '#rooms-4'].forEach((sel) => {
+    const el = $(sel);
+    if (el) el.addEventListener('input', updateRoomAllocHint);
+  });
+  const peopleEl = $('#people');
+  if (peopleEl) {
+    peopleEl.addEventListener('input', () => {
+      const people = Math.max(0, Number(peopleEl.value) || 0);
+      const alloc = readRoomAllocationInputs();
+      // 사용자가 손대지 않은 기본 상태(=다른 모든 칸 0)면 r1을 사람 수에 맞춰 자동 추적
+      if (alloc.r2 === 0 && alloc.r3 === 0 && alloc.r4 === 0) {
+        setRoomAllocationInputs({ r1: people, r2: 0, r3: 0, r4: 0 });
+      }
+      updateRoomAllocHint();
+    });
+  }
+  const autoBtn = $('#rooms-auto-btn');
+  if (autoBtn) {
+    autoBtn.addEventListener('click', () => {
+      const people = Math.max(0, Number($('#people').value) || 0);
+      setRoomAllocationInputs({ r1: people, r2: 0, r3: 0, r4: 0 });
+      updateRoomAllocHint();
+    });
+  }
 
   // 안드로이드 뒤로가기 처리: history API 활용
   window.addEventListener('popstate', (e) => {

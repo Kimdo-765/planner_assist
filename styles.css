@@ -384,6 +384,58 @@ input::placeholder { color: var(--muted); }
   font-weight: 600;
 }
 
+/* ========== Room allocation ========== */
+.room-alloc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+@media (max-width: 360px) {
+  .room-alloc-grid { grid-template-columns: 1fr; }
+}
+.room-alloc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 14px;
+  user-select: none;
+  min-height: 44px;
+}
+.room-alloc-label {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.room-alloc input[type="number"] {
+  width: 64px;
+  height: 36px;
+  text-align: center;
+  padding: 0 6px;
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+.room-alloc-suffix {
+  color: var(--muted);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+.room-alloc-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.small-btn {
+  font-size: 12.5px !important;
+  padding: 6px 10px !important;
+  font-weight: 500 !important;
+}
+.field-hint.warn { color: var(--danger); }
+.field-hint.ok { color: var(--text-2); }
+
 /* ========== Buttons ========== */
 .actions {
   display: flex;

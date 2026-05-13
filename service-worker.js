@@ -1,4 +1,4 @@
-const CACHE_NAME = 'planner-assist-v7';
+const CACHE_NAME = 'planner-assist-v8';
 const APP_SHELL = [
   './',
   './index.html',
